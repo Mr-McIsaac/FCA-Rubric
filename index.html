@@ -3,347 +3,575 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FCA Feedback Snippet Builder</title>
+    <title>FCA Rubric & Feedback Builder</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="icon" href="https://www.fcae.ca/static/site-content/page-uploads/1/twitter.jpg">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
         }
 
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .rubric-cell-input {
+            width: 100%;
+            resize: none;
+            font-size: 0.75rem;
+            line-height: 1.25;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid transparent;
+            background-color: transparent;
+            transition: all 0.2s;
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+        .rubric-cell-input:focus {
+            background-color: white;
+            border-color: #6366f1;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
         }
 
-        /* Snippet Button Animations */
-        .snippet-btn {
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        /* Grade Mode Cells */
+        .grade-cell {
+            transition: all 0.15s ease-in-out;
+            cursor: pointer;
+            border: 2px solid transparent;
         }
-        .snippet-btn:active {
-            transform: scale(0.97);
+        .grade-cell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        .snippet-selected {
-            background-color: #4f46e5; /* Indigo 600 */
-            color: white;
+        .grade-cell.selected {
             border-color: #4f46e5;
-            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+            background-color: #eef2ff;
         }
+        .grade-cell.selected .cell-desc { color: #3730a3; }
         
-        .toast-enter {
-            animation: slideInBottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
+        .toast-enter { animation: slideInBottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         @keyframes slideInBottom {
             from { transform: translate(-50%, 100%); opacity: 0; }
             to { transform: translate(-50%, 0); opacity: 1; }
         }
+
+        .tab-active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .tab-inactive {
+            background-color: #e2e8f0;
+            color: #64748b;
+        }
+        .tab-inactive:hover { background-color: #cbd5e1; }
     </style>
 </head>
-<body class="p-4 md:p-8 h-screen flex flex-col overflow-hidden">
+<body class="p-4 md:p-6 h-screen flex flex-col overflow-hidden">
     
-    <header class="text-center mb-8 flex-shrink-0">
-        <h1 class="text-4xl font-black text-slate-900 mb-2 tracking-tight">FCA Feedback Builder</h1>
-        <p class="text-slate-500 font-medium text-lg">Click snippets to generate a personalized feedback paragraph.</p>
+    <header class="mb-6 flex-shrink-0 flex flex-col md:flex-row justify-between items-center gap-4 max-w-7xl mx-auto w-full">
+        <div>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight">FCA Rubric & Feedback Tool</h1>
+            <p class="text-slate-500 font-medium text-sm">Design rubrics that automatically write feedback.</p>
+        </div>
+        
+        <!-- Navigation Tabs -->
+        <div class="flex gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+            <button onclick="switchMode('grade')" id="tab-grade" class="tab-active px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-sm">
+                ✅ Grade & Feedback
+            </button>
+            <button onclick="switchMode('edit')" id="tab-edit" class="tab-inactive px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2">
+                📝 Edit Rubric
+            </button>
+        </div>
     </header>
 
-    <div class="max-w-7xl mx-auto w-full flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden pb-4">
-        
-        <!-- Left Sidebar: The Output & Customization -->
-        <div class="lg:w-1/3 flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar pr-2">
+    <div class="max-w-7xl mx-auto w-full flex-1 flex flex-col overflow-hidden relative">
+
+        <!-- ==================== -->
+        <!-- VIEW: GRADE & FEEDBACK -->
+        <!-- ==================== -->
+        <div id="view-grade" class="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden w-full h-full">
             
-            <!-- Student Setup -->
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex-shrink-0">
-                <h2 class="text-lg font-bold text-slate-800 mb-4">Student Details</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Student Name</label>
-                        <input type="text" id="studentName" placeholder="e.g. Lily" oninput="generateOutput()"
-                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-semibold text-slate-700">
+            <!-- Sidebar: Output & Score -->
+            <div class="lg:w-1/3 flex flex-col gap-4 h-full flex-shrink-0">
+                
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-end mb-4">
+                        <div class="w-full">
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Student Name</label>
+                            <input type="text" id="studentName" placeholder="e.g. Jaxson" oninput="compileFeedback()"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-slate-700">
+                        </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Greeting Style</label>
-                        <select id="greetingStyle" onchange="generateOutput()" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-semibold text-slate-700 appearance-none">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Greeting Style</label>
+                        <select id="greetingStyle" onchange="compileFeedback()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-semibold text-slate-700 text-sm appearance-none">
                             <option value="Hi {name},">Hi [Name],</option>
-                            <option value="Great work on this, {name}.">Great work on this, [Name].</option>
-                            <option value="Feedback for {name}:">Feedback for [Name]:</option>
+                            <option value="Great work on this project, {name}.">Great work on this project, [Name].</option>
+                            <option value="Project Feedback for {name}:">Project Feedback for [Name]:</option>
                             <option value="none">No greeting</option>
                         </select>
                     </div>
                 </div>
+
+                <!-- Final Output Area -->
+                <div class="bg-indigo-50 p-5 rounded-3xl border border-indigo-100 flex-1 flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-lg font-bold text-indigo-900">Final Paragraph</h2>
+                        <!-- Score Display -->
+                        <div class="bg-indigo-600 text-white px-3 py-1 rounded-lg font-black shadow-sm flex items-center gap-1">
+                            <span id="scoreTotal" class="text-xl">0</span>
+                            <span id="scoreMax" class="text-xs text-indigo-200 opacity-80">/0</span>
+                        </div>
+                    </div>
+                    
+                    <textarea id="finalOutput" oninput="customEditMade()" class="w-full flex-1 p-4 bg-white border border-indigo-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-slate-700 text-sm leading-relaxed shadow-inner" placeholder="Select cells on the rubric to generate feedback..."></textarea>
+                    
+                    <div class="mt-4 flex gap-2 flex-shrink-0">
+                        <button onclick="clearGrades()" class="px-4 py-2.5 rounded-xl font-bold text-sm text-slate-500 bg-white border border-slate-200 hover:text-rose-500 transition-colors">
+                            Reset
+                        </button>
+                        <button onclick="copyToClipboard()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2.5 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex justify-center items-center gap-2 text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                            </svg>
+                            Copy Output
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- Final Output Area -->
-            <div class="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 flex-1 flex flex-col min-h-[350px]">
-                <div class="flex items-center justify-between mb-4 flex-shrink-0">
-                    <h2 class="text-lg font-bold text-indigo-900">Final Paragraph</h2>
-                    <span id="wordCount" class="text-xs font-bold text-indigo-400 uppercase tracking-wider bg-white px-2 py-1 rounded-md">0 words</span>
+            <!-- Interactive Rubric Area -->
+            <div class="lg:w-2/3 bg-white rounded-3xl shadow-sm border border-slate-200 h-full flex flex-col overflow-hidden">
+                <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <h2 id="gradeRubricTitle" class="text-xl font-bold text-slate-800">Project Rubric</h2>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Interactive Grader</span>
                 </div>
                 
-                <textarea id="finalOutput" class="w-full flex-1 p-4 bg-white border border-indigo-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-slate-700 leading-relaxed shadow-inner" placeholder="Your generated feedback will appear here..."></textarea>
-                
-                <div class="mt-4 flex gap-3 flex-shrink-0">
-                    <button onclick="clearAll()" class="px-5 py-3 rounded-xl font-bold text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 hover:text-rose-500 transition-colors">
-                        Clear
-                    </button>
-                    <button onclick="copyToClipboard()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex justify-center items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                            <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                        </svg>
-                        Copy Feedback
-                    </button>
+                <div class="flex-1 overflow-auto custom-scrollbar p-5">
+                    <div id="interactiveRubricContainer" class="min-w-[600px] flex flex-col gap-4">
+                        <!-- Grade Rubric Generated Here -->
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Main Area: The Snippet Board -->
-        <div class="lg:w-2/3 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 h-full flex flex-col">
-            <div class="flex items-center justify-between mb-6 flex-shrink-0">
-                <h2 class="text-2xl font-bold text-slate-800">Snippet Board</h2>
-                <div class="text-sm font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-                    Selected: <span id="selectedCount" class="font-bold text-slate-700">0</span>
+
+        <!-- ==================== -->
+        <!-- VIEW: EDIT RUBRIC -->
+        <!-- ==================== -->
+        <div id="view-edit" class="hidden flex-col gap-4 h-full w-full">
+            
+            <!-- Edit Controls -->
+            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 flex justify-between items-center flex-wrap gap-4 flex-shrink-0">
+                <div class="flex items-center gap-3 flex-1 min-w-[250px]">
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Rubric Title</label>
+                    <input type="text" id="editRubricTitle" onchange="updateRubricTitle()" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 outline-none">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="addCriterion()" class="px-4 py-2 bg-indigo-50 text-indigo-600 font-bold rounded-xl text-sm hover:bg-indigo-100 transition-colors border border-indigo-100">+ Add Row (Criterion)</button>
+                    <button onclick="resetToDefault()" class="px-4 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 transition-colors border border-rose-100">Reset to Defaults</button>
                 </div>
             </div>
 
-            <!-- Categories Container -->
-            <div id="categoriesContainer" class="flex-1 overflow-y-auto custom-scrollbar pr-4 space-y-8 pb-10">
-                <!-- Javascript will inject categories here -->
+            <!-- Editable Table -->
+            <div class="bg-white border border-slate-200 shadow-sm rounded-3xl flex-1 overflow-hidden flex flex-col">
+                <div class="bg-slate-800 text-white text-xs font-bold uppercase tracking-widest p-3 px-5 flex justify-between items-center">
+                    <span>Rubric Matrix Editor</span>
+                    <span class="text-slate-400 lowercase normal-case font-normal">Auto-saves to browser</span>
+                </div>
+                <div class="flex-1 overflow-auto custom-scrollbar p-0">
+                    <table class="w-full text-left border-collapse min-w-[800px]">
+                        <thead>
+                            <tr id="editTableHead" class="bg-slate-50 border-b border-slate-200">
+                                <!-- Headers injected here -->
+                            </tr>
+                        </thead>
+                        <tbody id="editTableBody" class="divide-y divide-slate-100">
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
         </div>
+
     </div>
 
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full font-bold shadow-2xl hidden z-50 flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
         Copied to clipboard!
     </div>
 
     <script>
-        // Data Structure for Snippets
-        const snippetData = [
-            {
-                category: "Creativity & Concept 🌟",
-                color: "emerald",
-                snippets: [
-                    "Your project shows a lot of originality and creative thinking.",
-                    "I love the unique concept you developed for this piece.",
-                    "You did a great job brainstorming and executing a fresh idea.",
-                    "The composition and visual balance of your work are excellent.",
-                    "Your project effectively solves the design/technical problem presented in the prompt.",
-                    "You really thought outside the box for this assignment!"
-                ]
-            },
-            {
-                category: "Technical Execution & Skill 🛠️",
-                color: "blue",
-                snippets: [
-                    "You demonstrated strong technical skills in this project.",
-                    "Great attention to detail in the construction and design of your work.",
-                    "You used the tools/software highly effectively to achieve your desired result.",
-                    "The overall craftsmanship of your final piece is outstanding.",
-                    "Your code/design is clean, well-organized, and functions exactly as intended."
-                ]
-            },
-            {
-                category: "Presentation & Communication 🗣️",
-                color: "indigo",
-                snippets: [
-                    "You spoke clearly and confidently during your presentation.",
-                    "Your visual aids were well-designed and really enhanced your message.",
-                    "You did a great job explaining your creative process to the class.",
-                    "You handled the feedback and Q&A session very well.",
-                    "Try to make a bit more eye contact with the audience next time."
-                ]
-            },
-            {
-                category: "Areas for Growth 🌱",
-                color: "amber",
-                snippets: [
-                    "Try to push your initial ideas further before settling on a final concept.",
-                    "Pay a bit more attention to the finishing details to really polish your final product.",
-                    "In the future, try to manage your time more effectively during the planning phase.",
-                    "Consider how different color choices or materials might change the mood of your work.",
-                    "Make sure to test your project more thoroughly to catch minor bugs or structural issues."
-                ]
-            },
-            {
-                category: "Requirements & Workflow 📐",
-                color: "rose",
-                snippets: [
-                    "Make sure you review the project rubric to ensure all requirements are met.",
-                    "Your project is missing a few of the required elements we discussed.",
-                    "Great job documenting your progress and workflow.",
-                    "Remember to save and organize your files according to the class naming conventions.",
-                    "Excellent job keeping your workspace clean and organized."
-                ]
-            },
-            {
-                category: "Closing Remarks 🏁",
-                color: "emerald",
-                snippets: [
-                    "Overall, a fantastic effort on this project!",
-                    "You are definitely developing a great eye for design.",
-                    "Please come see me if you need help troubleshooting these technical issues.",
-                    "Keep up the great work and keep pushing your boundaries!",
-                    "I can see how much effort and time you put into this.",
-                    "I'm really looking forward to seeing what you create next."
-                ]
-            }
-        ];
+        // --- Application State ---
+        
+        const DEFAULT_STATE = {
+            title: "Art & Tech Project Rubric",
+            levels: [
+                { id: "l4", name: "Exceeds", points: 4 },
+                { id: "l3", name: "Meets", points: 3 },
+                { id: "l2", name: "Approaching", points: 2 },
+                { id: "l1", name: "Needs Work", points: 1 }
+            ],
+            criteria: [
+                {
+                    id: "c1",
+                    name: "Creativity & Concept",
+                    cells: {
+                        "l4": { desc: "Highly original concept that creatively solves the prompt.", snippet: "Your project shows incredible originality and creative problem-solving." },
+                        "l3": { desc: "Good concept with clear intent.", snippet: "You developed a very solid, clear concept for this piece." },
+                        "l2": { desc: "Basic concept, somewhat derivative.", snippet: "Your idea is good, but try to push your brainstorming further to make it more unique." },
+                        "l1": { desc: "Concept is unclear or off-prompt.", snippet: "I had trouble understanding the core concept behind your piece. Let's chat about planning." }
+                    }
+                },
+                {
+                    id: "c2",
+                    name: "Technical Execution",
+                    cells: {
+                        "l4": { desc: "Flawless craftsmanship and highly effective use of tools.", snippet: "Your technical execution and attention to detail are outstanding." },
+                        "l3": { desc: "Good craftsmanship, tools used correctly.", snippet: "You demonstrated strong technical skills and used the tools effectively." },
+                        "l2": { desc: "Minor flaws in execution or tool usage.", snippet: "Your technical skills are developing, but pay closer attention to the finishing details." },
+                        "l1": { desc: "Major structural or technical flaws.", snippet: "There are some significant technical issues here. Make sure to review the tool tutorials." }
+                    }
+                },
+                {
+                    id: "c3",
+                    name: "Requirements & Workflow",
+                    cells: {
+                        "l4": { desc: "All requirements met. Files organized perfectly.", snippet: "You followed all instructions perfectly and your workflow was highly organized." },
+                        "l3": { desc: "Most requirements met.", snippet: "You met the core requirements of the project." },
+                        "l2": { desc: "Missing minor requirements or disorganized.", snippet: "You missed a few minor project requirements. Make sure to double-check the rubric next time." },
+                        "l1": { desc: "Missing major requirements.", snippet: "You missed several key requirements for this project." }
+                    }
+                }
+            ]
+        };
 
-        let selectedSnippets = new Set();
-        let customEdits = false; // Tracks if the user manually typed in the text area
+        let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        let selections = {}; // { criterionId: levelId }
+        let customEdits = false;
+        let currentMode = 'grade'; // 'grade' or 'edit'
 
-        // Initialize UI
+        // --- Init & Storage ---
         function init() {
-            renderCategories();
+            const saved = localStorage.getItem('fca_rubric_data');
+            if (saved) {
+                try {
+                    state = JSON.parse(saved);
+                } catch(e) { console.error("Could not parse saved data"); }
+            }
+            document.getElementById('editRubricTitle').value = state.title;
             
-            // Listen for manual edits in the textarea
-            document.getElementById('finalOutput').addEventListener('input', () => {
-                customEdits = true;
-                updateWordCount();
-            });
+            renderGradeView();
+            renderEditView();
+            updateScoreDisplay();
         }
 
-        function renderCategories() {
-            const container = document.getElementById('categoriesContainer');
+        function saveData() {
+            localStorage.setItem('fca_rubric_data', JSON.stringify(state));
+        }
+
+        function resetToDefault() {
+            if(confirm("Are you sure? This will erase your current rubric and restore the default Art/Tech rubric.")) {
+                state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+                selections = {};
+                document.getElementById('editRubricTitle').value = state.title;
+                saveData();
+                renderGradeView();
+                renderEditView();
+                compileFeedback();
+                updateScoreDisplay();
+            }
+        }
+
+        // --- Navigation ---
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            const btnGrade = document.getElementById('tab-grade');
+            const btnEdit = document.getElementById('tab-edit');
+            const viewGrade = document.getElementById('view-grade');
+            const viewEdit = document.getElementById('view-edit');
+
+            if (mode === 'grade') {
+                btnGrade.className = 'tab-active px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-sm';
+                btnEdit.className = 'tab-inactive px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2';
+                viewGrade.classList.remove('hidden');
+                viewGrade.classList.add('flex');
+                viewEdit.classList.add('hidden');
+                viewEdit.classList.remove('flex');
+                renderGradeView(); // re-render to catch any edits
+            } else {
+                btnEdit.className = 'tab-active px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-sm';
+                btnGrade.className = 'tab-inactive px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2';
+                viewEdit.classList.remove('hidden');
+                viewEdit.classList.add('flex');
+                viewGrade.classList.add('hidden');
+                viewGrade.classList.remove('flex');
+                renderEditView();
+            }
+        }
+
+        // --- Grade & Feedback Logic ---
+        
+        function renderGradeView() {
+            document.getElementById('gradeRubricTitle').innerText = state.title;
+            const container = document.getElementById('interactiveRubricContainer');
             container.innerHTML = '';
 
-            snippetData.forEach((section, sIndex) => {
-                const sectionDiv = document.createElement('div');
+            state.criteria.forEach(crit => {
+                const row = document.createElement('div');
+                row.className = 'flex flex-col mb-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm';
                 
-                // Color mapping for category titles
-                const colorMap = {
-                    'emerald': 'text-emerald-600',
-                    'amber': 'text-amber-600',
-                    'rose': 'text-rose-600',
-                    'blue': 'text-blue-600',
-                    'indigo': 'text-indigo-600'
-                };
-                
-                sectionDiv.innerHTML = `
-                    <h3 class="text-sm font-black uppercase tracking-widest ${colorMap[section.color]} mb-3 flex items-center gap-2">
-                        ${section.category}
-                        <div class="h-px flex-1 bg-slate-100 ml-2"></div>
-                    </h3>
-                    <div class="flex flex-wrap gap-2">
-                        ${section.snippets.map((snippet, i) => `
-                            <button 
-                                id="btn-${sIndex}-${i}"
-                                onclick="toggleSnippet('${sIndex}-${i}', \`${snippet}\`)"
-                                class="snippet-btn text-left px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:border-indigo-300 hover:bg-indigo-50 leading-snug max-w-full">
-                                ${snippet}
-                            </button>
-                        `).join('')}
-                    </div>
-                `;
-                container.appendChild(sectionDiv);
+                const title = document.createElement('h3');
+                title.className = 'text-sm font-black uppercase tracking-widest text-slate-700 mb-3';
+                title.innerText = crit.name;
+                row.appendChild(title);
+
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-4 gap-3'; // Assumes 4 levels. Adjust if dynamic column support added.
+
+                state.levels.forEach(level => {
+                    const cellData = crit.cells[level.id] || { desc: '', snippet: '' };
+                    const isSelected = selections[crit.id] === level.id;
+                    
+                    const cellBtn = document.createElement('div');
+                    cellBtn.className = `grade-cell p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2 relative ${isSelected ? 'selected' : ''}`;
+                    cellBtn.onclick = () => selectCell(crit.id, level.id);
+
+                    cellBtn.innerHTML = `
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-900">${level.name}</span>
+                            <span class="text-xs font-black text-indigo-400 bg-white px-1.5 rounded">${level.points}pt</span>
+                        </div>
+                        <p class="cell-desc text-xs text-slate-600 leading-snug">${cellData.desc || '<i class="opacity-50">No description</i>'}</p>
+                        ${isSelected ? `<div class="absolute -top-2 -right-2 bg-indigo-600 text-white rounded-full p-1 shadow-md"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg></div>` : ''}
+                    `;
+                    grid.appendChild(cellBtn);
+                });
+
+                row.appendChild(grid);
+                container.appendChild(row);
             });
+            updateScoreDisplay();
         }
 
-        function toggleSnippet(btnId, text) {
-            const btn = document.getElementById(`btn-${btnId}`);
-            
-            if (selectedSnippets.has(text)) {
-                selectedSnippets.delete(text);
-                btn.classList.remove('snippet-selected');
+        function selectCell(critId, levelId) {
+            if (selections[critId] === levelId) {
+                delete selections[critId]; // Deselect if already selected
             } else {
-                selectedSnippets.add(text);
-                btn.classList.add('snippet-selected');
+                selections[critId] = levelId;
             }
-
-            document.getElementById('selectedCount').innerText = selectedSnippets.size;
-            customEdits = false; // Reset custom edits flag when using the builder
-            generateOutput();
+            customEdits = false;
+            renderGradeView();
+            compileFeedback();
         }
 
-        function generateOutput() {
-            if (customEdits) return; // Don't overwrite if the teacher typed custom text
+        function updateScoreDisplay() {
+            let score = 0;
+            let maxScore = 0;
 
+            state.criteria.forEach(c => {
+                // Find max points for this criteria
+                const maxLevelObj = state.levels.reduce((prev, current) => (prev.points > current.points) ? prev : current);
+                maxScore += maxLevelObj.points;
+
+                if (selections[c.id]) {
+                    const level = state.levels.find(l => l.id === selections[c.id]);
+                    if (level) score += level.points;
+                }
+            });
+
+            document.getElementById('scoreTotal').innerText = score;
+            document.getElementById('scoreMax').innerText = `/${maxScore}`;
+        }
+
+        function customEditMade() {
+            customEdits = true;
+        }
+
+        function compileFeedback() {
+            if (customEdits) return; // Prevent overwriting manual typed edits
+            
             const studentName = document.getElementById('studentName').value.trim();
             const greetingTemplate = document.getElementById('greetingStyle').value;
             const outputArea = document.getElementById('finalOutput');
 
             let finalString = "";
 
-            // 1. Add Greeting
+            // Greeting
             if (greetingTemplate !== "none") {
                 if (studentName) {
                     finalString += greetingTemplate.replace('{name}', studentName) + "\n\n";
                 } else {
-                    // Fallback if no name entered but a greeting is selected
                     finalString += greetingTemplate.replace(', {name}', '').replace(' {name}', '').replace('{name}', 'Student') + "\n\n";
                 }
             }
 
-            // 2. Add Snippets
-            if (selectedSnippets.size > 0) {
-                // Convert set to array and join with a space
-                finalString += Array.from(selectedSnippets).join(" ");
+            // Snippets
+            let snippets = [];
+            state.criteria.forEach(crit => {
+                const selLevelId = selections[crit.id];
+                if (selLevelId) {
+                    const cell = crit.cells[selLevelId];
+                    if (cell && cell.snippet && cell.snippet.trim() !== '') {
+                        snippets.push(cell.snippet.trim());
+                    }
+                }
+            });
+
+            if (snippets.length > 0) {
+                finalString += snippets.join(" ");
             }
 
             outputArea.value = finalString;
-            updateWordCount();
         }
 
-        function updateWordCount() {
-            const text = document.getElementById('finalOutput').value.trim();
-            const count = text === "" ? 0 : text.split(/\s+/).length;
-            document.getElementById('wordCount').innerText = `${count} word${count !== 1 ? 's' : ''}`;
-        }
-
-        function clearAll() {
-            selectedSnippets.clear();
-            document.getElementById('studentName').value = '';
-            document.getElementById('greetingStyle').value = 'Hi {name},';
+        function clearGrades() {
+            selections = {};
             customEdits = false;
-            
-            // Remove styling from all buttons
-            document.querySelectorAll('.snippet-selected').forEach(btn => {
-                btn.classList.remove('snippet-selected');
-            });
-            
-            document.getElementById('selectedCount').innerText = '0';
-            generateOutput();
+            document.getElementById('studentName').value = '';
+            renderGradeView();
+            compileFeedback();
         }
 
         function copyToClipboard() {
             const outputArea = document.getElementById('finalOutput');
-            
             if (outputArea.value.trim() === '') {
-                // Briefly shake the textarea if it's empty
                 outputArea.classList.add('border-rose-500', 'bg-rose-50');
                 setTimeout(() => outputArea.classList.remove('border-rose-500', 'bg-rose-50'), 300);
                 return;
             }
-
             outputArea.select();
             document.execCommand('copy');
-            
-            // Show Toast
             const toast = document.getElementById('toast');
             toast.classList.remove('hidden');
             toast.classList.add('toast-enter');
-            
-            setTimeout(() => {
-                toast.classList.add('hidden');
-                toast.classList.remove('toast-enter');
-            }, 2500);
+            setTimeout(() => { toast.classList.add('hidden'); toast.classList.remove('toast-enter'); }, 2500);
+        }
+
+        // --- Editor Logic ---
+        
+        function updateRubricTitle() {
+            state.title = document.getElementById('editRubricTitle').value;
+            saveData();
+        }
+
+        function renderEditView() {
+            const tHead = document.getElementById('editTableHead');
+            const tBody = document.getElementById('editTableBody');
+
+            // Header
+            let headHTML = `<th class="p-4 w-48 border-r border-slate-200 text-slate-500 text-xs font-black uppercase tracking-wider">Criteria Name</th>`;
+            state.levels.forEach(level => {
+                headHTML += `
+                    <th class="p-3 border-r border-slate-200 min-w-[200px]">
+                        <div class="flex gap-2">
+                            <input type="text" value="${level.name}" onchange="updateLevel('${level.id}', 'name', this.value)" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500">
+                            <input type="number" value="${level.points}" onchange="updateLevel('${level.id}', 'points', parseInt(this.value))" class="w-16 bg-slate-100 border border-slate-200 rounded px-2 py-1 text-sm font-black text-indigo-600 outline-none focus:border-indigo-500 text-center" title="Points">
+                        </div>
+                    </th>
+                `;
+            });
+            headHTML += `<th class="p-2 w-16"></th>`; // Delete action column
+            tHead.innerHTML = headHTML;
+
+            // Body
+            tBody.innerHTML = '';
+            state.criteria.forEach((crit, rIndex) => {
+                const tr = document.createElement('tr');
+                
+                // Crit Name Cell
+                let rowHTML = `
+                    <td class="p-4 border-r border-slate-200 align-top bg-slate-50">
+                        <textarea onchange="updateCriterion('${crit.id}', this.value)" class="w-full h-full min-h-[100px] resize-none bg-transparent font-bold text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 p-2 rounded-lg" placeholder="Criteria Name...">${crit.name}</textarea>
+                    </td>
+                `;
+
+                // Level Cells
+                state.levels.forEach(level => {
+                    const cell = crit.cells[level.id] || { desc: '', snippet: '' };
+                    rowHTML += `
+                        <td class="p-2 border-r border-slate-200 align-top">
+                            <div class="flex flex-col gap-2 h-full">
+                                <div class="relative group">
+                                    <span class="absolute -top-2 left-2 bg-white px-1 text-[10px] font-bold text-slate-400 uppercase">Rubric Text</span>
+                                    <textarea onchange="updateCell('${crit.id}', '${level.id}', 'desc', this.value)" class="rubric-cell-input h-20 pt-3" placeholder="Expectation description...">${cell.desc}</textarea>
+                                </div>
+                                <div class="relative group">
+                                    <span class="absolute -top-2 left-2 bg-white px-1 text-[10px] font-bold text-indigo-400 uppercase">Feedback Snippet</span>
+                                    <textarea onchange="updateCell('${crit.id}', '${level.id}', 'snippet', this.value)" class="rubric-cell-input h-20 pt-3 bg-indigo-50/30" placeholder="Feedback generated...">${cell.snippet}</textarea>
+                                </div>
+                            </div>
+                        </td>
+                    `;
+                });
+
+                // Delete Row Cell
+                rowHTML += `
+                    <td class="p-2 align-middle text-center bg-slate-50">
+                        <button onclick="deleteCriterion('${crit.id}')" class="text-rose-400 hover:text-rose-600 p-2 rounded hover:bg-rose-50 transition" title="Delete Row">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </td>
+                `;
+
+                tr.innerHTML = rowHTML;
+                tBody.appendChild(tr);
+            });
+        }
+
+        // Data mutators
+        function updateLevel(id, field, value) {
+            const level = state.levels.find(l => l.id === id);
+            if (level) {
+                level[field] = value;
+                saveData();
+            }
+        }
+
+        function updateCriterion(id, value) {
+            const crit = state.criteria.find(c => c.id === id);
+            if (crit) {
+                crit.name = value;
+                saveData();
+            }
+        }
+
+        function updateCell(critId, levelId, field, value) {
+            const crit = state.criteria.find(c => c.id === critId);
+            if (crit) {
+                if (!crit.cells[levelId]) crit.cells[levelId] = { desc: '', snippet: '' };
+                crit.cells[levelId][field] = value;
+                saveData();
+            }
+        }
+
+        function addCriterion() {
+            const newId = 'c' + Date.now();
+            const newCrit = { id: newId, name: "New Criterion", cells: {} };
+            state.levels.forEach(l => {
+                newCrit.cells[l.id] = { desc: "", snippet: "" };
+            });
+            state.criteria.push(newCrit);
+            saveData();
+            renderEditView();
+        }
+
+        function deleteCriterion(id) {
+            if (confirm("Delete this row entirely?")) {
+                state.criteria = state.criteria.filter(c => c.id !== id);
+                delete selections[id]; // clean up selection
+                saveData();
+                renderEditView();
+            }
         }
 
         window.onload = init;
